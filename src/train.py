@@ -1,11 +1,11 @@
 # %% [code]
 import pandas as pd
 import seaborn as sns
-from sklearn.compose import make_column_transformer
+from sklearn.compose import make_column_transformer, ColumnTransformer
 from sklearn.impute import SimpleImputer
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import OneHotEncoder, LabelEncoder
-from sklearn.linear_model import Lasso
+from sklearn.pipeline import make_pipeline, FeatureUnion
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder, FunctionTransformer
+from sklearn.feature_extraction.text import CountVectorizer
 from xgboost import XGBRegressor
 from helpers import *
 
@@ -24,6 +24,7 @@ correlations = X_train.corr()
 
 sns.heatmap(correlations, mask=correlations < 0.8, annot=True)
 
+# Sorted by correlation factor
 # YearBuilt > GarageYrBuilt
 # GarageArea > GarageCars
 # GrLivArea > TotRmsAbvGrd
@@ -51,30 +52,67 @@ features = continuous + categorical
 all_features = features + ["SalePrice"]
 removed_features = X.columns.drop(features).tolist()
 
+# Make some continuous features categorical
+continuous.remove("MSSubClass")
+categorical.append("MSSubClass")
+
 X[features].head()
-# %% [code]
+# %%
+# Concatenate list columns
+listed = [
+    "Condition1",
+    "Condition2",
+    "Exterior1st",
+    "Exterior2nd",
+    "BsmtFinType1",
+    "BsmtFinType2",
+]
+
+X["Attributes"] = [list(row[listed].astype(str)) for _, row in X.iterrows()]
+X_test["Attributes"] = [list(row[listed].astype(str)) for _, row in X_test.iterrows()]
+
+for col in listed:
+    if col in categorical:
+        categorical.remove(col)
+# %%
 ## Create pipeline
-continuous_transformer = make_pipeline(SimpleImputer(strategy="constant"))
+continuous_transformer = SimpleImputer(strategy="constant")
 
 categorical_transformer = make_pipeline(
     SimpleImputer(strategy="most_frequent"),
-    OneHotEncoder(handle_unknown="ignore"),
+    OneHotEncoder(handle_unknown="ignore", sparse=False),
 )
 
-preprocessor = make_column_transformer(
-    (
-        continuous_transformer,
-        continuous,
-    ),
-    (
-        categorical_transformer,
-        categorical,
-    ),
+list_tranformer = CountVectorizer(analyzer=set)
+
+preprocessor = ColumnTransformer(
+    transformers=[
+        (
+            "continuous",
+            continuous_transformer,
+            continuous,
+        ),
+        (
+            "categorical",
+            categorical_transformer,
+            categorical,
+        ),
+        ("list", list_tranformer, "Attributes"),
+    ]
 )
 
-estimator = XGBRegressor(learning_rate=0.1, random_state=0)
-pipeline = make_pipeline(preprocessor, estimator)
+processed = preprocessor.fit_transform(X.copy())
+processed_features = (
+    continuous
+    + (
+        preprocessor.named_transformers_.categorical.named_steps.onehotencoder.get_feature_names(
+            categorical
+        ).tolist()
+    )
+    + preprocessor.named_transformers_.list.get_feature_names()
+)
 
+pd.DataFrame(processed, columns=processed_features)
 # %%
 from sklearn.model_selection import GridSearchCV
 
@@ -86,7 +124,7 @@ best_params = {
 
 if not best_params:
     grid_search = GridSearchCV(
-        pipeline,
+        make_pipeline(preprocessor, XGBRegressor()),
         {
             "xgbregressor__n_estimators": [100, 500, 1000],
             "xgbregressor__learning_rate": [0.01, 0.03],
