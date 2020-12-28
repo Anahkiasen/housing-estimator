@@ -31,12 +31,7 @@ data_leaks = ["MoSold", "YrSold", "SaleType"]
 arbitrary = []
 
 ## Define correlated features
-correlated = [
-    "GarageYrBlt",
-    # "TotRmsAbvGrd",
-    # "GarageCars",
-    #  "1stFlrSF"
-]
+correlated = ["GarageYrBlt", "TotRmsAbvGrd", "GarageCars", "1stFlrSF"]
 
 ## Select features
 [continuous, categorical] = get_features(
