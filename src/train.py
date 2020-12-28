@@ -36,12 +36,16 @@ X_train_full.dropna(axis=0, subset=["SalePrice"], inplace=True)
 y = X_train_full.SalePrice
 X_train_full.drop(["SalePrice"], axis=1, inplace=True)
 
+# Remove data leakage
+potential_leaks = ["MoSold", "YrSold", "SaleType"]
+X_train_full = X_train_full.drop(potential_leaks, axis=1)
+
 # "Cardinality" means the number of unique values in a column
 # Select categorical columns with relatively low cardinality (convenient but arbitrary)
 cardinal_categorical_cols = [
     cname
     for cname in X_train_full.columns
-    if X_train_full[cname].nunique() < 10 and X_train_full[cname].dtype == "object"
+    if X_train_full[cname].nunique() > 0 and X_train_full[cname].dtype == "object"
 ]
 
 # Select numerical columns
@@ -53,6 +57,7 @@ numerical_cols = [
 
 # Keep selected columns only
 selected_cols = cardinal_categorical_cols + numerical_cols
+excluded_cols = [col for col in X_train_full.columns if col not in selected_cols]
 X = X_train_full[selected_cols].copy()
 X_test = X_test_full[selected_cols].copy()
 
