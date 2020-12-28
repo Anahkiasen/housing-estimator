@@ -102,7 +102,7 @@ for converted in converted_ordinal:
     continuous.append(converted)
 # %%
 # Concatenate list columns
-listed = [
+list_columns = [
     "Condition1",
     "Condition2",
     "Exterior1st",
@@ -111,7 +111,16 @@ listed = [
     # "BsmtFinType2",
 ]
 
-for col in listed:
+
+def create_attributes(data):
+    data["Attributes"] = [
+        list(row[list_columns].astype(str)) for _, row in data.iterrows()
+    ]
+
+    return data
+
+
+for col in list_columns:
     if col in categorical:
         categorical.remove(col)
 # %%
@@ -122,14 +131,6 @@ categorical_transformer = make_pipeline(
     SimpleImputer(strategy="most_frequent"),
     OneHotEncoder(handle_unknown="ignore", sparse=False),
 )
-
-list_tranformer = CountVectorizer(analyzer=set)
-
-
-def create_attributes(data):
-    data["Attributes"] = [list(row[listed].astype(str)) for _, row in data.iterrows()]
-
-    return data
 
 
 preprocessor = make_pipeline(
@@ -149,7 +150,7 @@ preprocessor = make_pipeline(
                 categorical_transformer,
                 categorical,
             ),
-            ("list", list_tranformer, "Attributes"),
+            ("list", CountVectorizer(analyzer=set), "Attributes"),
         ]
     ),
 )
@@ -178,6 +179,9 @@ best_params = {
     "xgbregressor__learning_rate": 0.03,
     "xgbregressor__max_depth": 3,
     "xgbregressor__n_estimators": 1000,
+    "xgbregressor__min_child_weight": 2,
+    "xgbregressor__gamma": 0,
+    "xgbregressor__subsample": 0.75,
 }
 
 if not best_params:
@@ -187,9 +191,12 @@ if not best_params:
             "xgbregressor__n_estimators": [100, 500, 1000],
             "xgbregressor__learning_rate": [0.01, 0.03],
             "xgbregressor__max_depth": [3, 6, 9],
+            "xgbregressor__min_child_weight": [1, 2, 3],
+            "xgbregressor__gamma": [0, 0.1],
+            "xgbregressor__subsample": [0.25, 0.5, 0.75],
         },
         scoring="neg_root_mean_squared_error",
-        verbose=2,
+        verbose=10,
         n_jobs=-1,
     )
 
