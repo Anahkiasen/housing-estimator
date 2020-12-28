@@ -224,21 +224,23 @@ processed = preprocessor.fit_transform(X.copy(), y)
 
 applied_transformers = preprocessor.named_steps.columntransformer.named_transformers_
 
-continuous_features = continuous_features(transformed)
+transformed_continuous = continuous_features(transformed)
 
-categorical_features = (
+transformed_categorical = (
     applied_transformers.categorical.named_steps.onehotencoder.get_feature_names(
         categorical_features(transformed)
     ).tolist()
 )
 
-list_features = [
+transformed_list = [
     "Attribute" + col for col in applied_transformers.list.get_feature_names()
 ]
 
-processed_features = continuous_features + categorical_features + list_features
+processed_features = transformed_continuous + transformed_categorical + transformed_list
 processed = pd.DataFrame(processed, columns=processed_features)
 processed.head()
+
+processed["SalePrice"] = y
 # %% Create pipeline
 pipeline = make_pipeline(preprocessor, XGBRegressor())
 # %%
