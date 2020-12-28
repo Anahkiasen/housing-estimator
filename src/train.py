@@ -170,7 +170,7 @@ categorical_transformer = make_pipeline(
 
 preprocessor = make_pipeline(
     make_pipeline(
-        # FunctionTransformer(backfill_missing),
+        FunctionTransformer(backfill_missing),
         FunctionTransformer(merge_attributes),
         FunctionTransformer(transform_ordinal),
     ),
