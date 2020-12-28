@@ -1,5 +1,3 @@
-import os
-
 if not os.path.exists("../input/train.csv"):
     os.symlink("../input/home-data-for-ml-course/train.csv", "../input/train.csv")
     os.symlink("../input/home-data-for-ml-course/test.csv", "../input/test.csv")
@@ -13,6 +11,7 @@ print("Setup Complete")
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error
 
 # Read the data
 X_full = pd.read_csv("../input/train.csv", index_col="Id")
@@ -38,14 +37,19 @@ X_train, X_valid, y_train, y_valid = train_test_split(
     X, y, train_size=0.8, test_size=0.2, random_state=0
 )
 
-# %% [code]
-# Define a model
 # for split in [5, 10, 15, 20]:
 my_model = RandomForestRegressor(
-    n_estimators=75, criterion="mae", max_depth=15, random_state=1
+    n_estimators=75, criterion="mae", max_depth=15, random_state=0
 )
 
-#print("Score: ", score_model(my_model))
+
+def score_model(model):
+    model.fit(X_train, y_train)
+    pred = model.predict(X_valid)
+    return mean_absolute_error(pred, y_valid)
+
+
+print("Score: ", score_model(my_model))
 
 my_model.fit(X, y)
 preds_test = my_model.predict(X_test)
