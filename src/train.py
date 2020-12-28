@@ -22,7 +22,7 @@ X_test = pd.read_csv("../input/home-data-for-ml-course/test.csv", index_col="Id"
 ## Define correlated features
 correlations = X_train.corr()
 
-sns.heatmap(correlations, mask=correlations < 0.8, annot=True)
+# sns.heatmap(correlations, mask=correlations < 0.8, annot=True)
 
 # Sorted by correlation factor
 # YearBuilt > GarageYrBuilt
@@ -55,8 +55,6 @@ removed_features = X.columns.drop(features).tolist()
 # Make some continuous features categorical
 continuous.remove("MSSubClass")
 categorical.append("MSSubClass")
-
-X[features].head()
 # %%
 # Concatenate list columns
 listed = [
@@ -67,9 +65,6 @@ listed = [
     "BsmtFinType1",
     "BsmtFinType2",
 ]
-
-X["Attributes"] = [list(row[listed].astype(str)) for _, row in X.iterrows()]
-X_test["Attributes"] = [list(row[listed].astype(str)) for _, row in X_test.iterrows()]
 
 for col in listed:
     if col in categorical:
@@ -85,35 +80,50 @@ categorical_transformer = make_pipeline(
 
 list_tranformer = CountVectorizer(analyzer=set)
 
-preprocessor = ColumnTransformer(
-    transformers=[
-        (
-            "continuous",
-            continuous_transformer,
-            continuous,
-        ),
-        (
-            "categorical",
-            categorical_transformer,
-            categorical,
-        ),
-        ("list", list_tranformer, "Attributes"),
-    ]
-)
 
+def create_attributes(data):
+    data["Attributes"] = [list(row[listed].astype(str)) for _, row in data.iterrows()]
+
+    return data
+
+
+preprocessor = make_pipeline(
+    FunctionTransformer(create_attributes),
+    ColumnTransformer(
+        transformers=[
+            (
+                "continuous",
+                continuous_transformer,
+                continuous,
+            ),
+            (
+                "categorical",
+                categorical_transformer,
+                categorical,
+            ),
+            ("list", list_tranformer, "Attributes"),
+        ]
+    ),
+)
+# %%
+# Test out pipeline
 processed = preprocessor.fit_transform(X.copy())
+
+applied_transformers = preprocessor[1].named_transformers_
+
 processed_features = (
     continuous
     + (
-        preprocessor.named_transformers_.categorical.named_steps.onehotencoder.get_feature_names(
+        applied_transformers.categorical.named_steps.onehotencoder.get_feature_names(
             categorical
         ).tolist()
     )
-    + preprocessor.named_transformers_.list.get_feature_names()
+    + applied_transformers.list.get_feature_names()
 )
 
 pd.DataFrame(processed, columns=processed_features)
 # %%
+# Find best hyperparameters
 from sklearn.model_selection import GridSearchCV
 
 best_params = {
@@ -137,7 +147,9 @@ if not best_params:
 
     grid_search.fit(X, y)
     best_params = grid_search.best_params_
+    print(best_params)
 # %%
+# Score pipeline
 pipeline = make_pipeline(preprocessor, XGBRegressor())
 pipeline.set_params(**best_params)
 
