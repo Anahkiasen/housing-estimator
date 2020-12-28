@@ -5,10 +5,10 @@ from sklearn.compose import make_column_transformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+from sklearn.linear_model import Lasso
 from xgboost import XGBRegressor
 from helpers import *
 
-plt.rcParams.update({"figure.figsize": (13, 10)})
 # %% [code]
 # Import the data
 X_train = pd.read_csv("../input/home-data-for-ml-course/train.csv", index_col="Id")
@@ -19,19 +19,24 @@ X_test = pd.read_csv("../input/home-data-for-ml-course/test.csv", index_col="Id"
 [X, y] = split_predictor(X_train, "SalePrice")
 
 # %%
-# Draw correlations
+## Define correlated features
 correlations = X_train.corr()
 
-sns.heatmap(correlations, mask=correlations < 0.8)
+sns.heatmap(correlations, mask=correlations < 0.8, annot=True)
+
+# YearBuilt > GarageYrBuilt
+# GarageArea > GarageCars
+# GrLivArea > TotRmsAbvGrd
+# TotalBsmtSF > 1stFlrSF
+correlated = ["GarageYrBlt", "TotRmsAbvGrd", "GarageCars", "1stFlrSF"]
+
+X_train.corr().SalePrice.sort_values()
 # %% [code]
 ## Define data leaks
 data_leaks = ["MoSold", "YrSold", "SaleType"]
 
 ## Define arbitrary features
 arbitrary = []
-
-## Define correlated features
-correlated = ["GarageYrBlt", "TotRmsAbvGrd", "GarageCars", "1stFlrSF"]
 
 ## Select features
 [continuous, categorical] = get_features(
@@ -44,6 +49,7 @@ correlated = ["GarageYrBlt", "TotRmsAbvGrd", "GarageCars", "1stFlrSF"]
 
 features = continuous + categorical
 all_features = features + ["SalePrice"]
+removed_features = X.columns.drop(features).tolist()
 
 X[features].head()
 # %% [code]
@@ -66,36 +72,43 @@ preprocessor = make_column_transformer(
     ),
 )
 
-estimator = XGBRegressor(n_estimators=100, learning_rate=0.1, random_state=0)
-
+estimator = XGBRegressor(learning_rate=0.1, random_state=0)
 pipeline = make_pipeline(preprocessor, estimator)
 
-score = get_score(pipeline, X, y, {"scoring": "neg_mean_absolute_error", "cv": 5})
+# %%
+from sklearn.model_selection import GridSearchCV
 
-"{:,.0f}".format(score * -1)
+best_params = {
+    "xgbregressor__learning_rate": 0.03,
+    "xgbregressor__max_depth": 3,
+    "xgbregressor__n_estimators": 1000,
+}
+
+if not best_params:
+    grid_search = GridSearchCV(
+        pipeline,
+        {
+            "xgbregressor__n_estimators": [100, 500, 1000],
+            "xgbregressor__learning_rate": [0.01, 0.03],
+            "xgbregressor__max_depth": [3, 6, 9],
+        },
+        scoring="neg_root_mean_squared_error",
+        verbose=2,
+        n_jobs=-1,
+    )
+
+    grid_search.fit(X, y)
+    best_params = grid_search.best_params_
+# %%
+pipeline = make_pipeline(preprocessor, XGBRegressor())
+pipeline.set_params(**best_params)
+
+get_score(pipeline, X, y, {"scoring": "neg_mean_absolute_error"})
 # %%
 # %% [code]
-## Search for algorithm
-look_for_algorithm(
-    X,
-    y,
-    enabled=False,
-    ratio=0.5,
-    preprocessor=preprocessor,
-    cv_options={"cv": 2, "scoring": "neg_mean_absolute_error"},
-)
-
-
-# %% [code]
-## Train algorithm
-pipeline.fit(X, y)
-
-
-# %% [code]
 ## Get predictions
+pipeline.fit(X, y)
 predictions = pipeline.predict(X_test)
 submissions = {"Id": X_test.index, "SalePrice": predictions}
 
 submit_predictions(submissions)
-
-# %%
