@@ -1,75 +1,97 @@
 import os
+import optparse
 import pandas as pd
-import numpy as np
 from learntools.core import binder
-from learntools.ml_intermediate.ex1 import *
-from sklearn.model_selection import train_test_split
+from learntools.ml_intermediate.ex4 import *
+from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error
 from sklearn.impute import SimpleImputer
+from sklearn.metrics import mean_absolute_error
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder
 
 if not os.path.exists("../input/train.csv"):
     os.symlink("../input/home-data-for-ml-course/train.csv", "../input/train.csv")
     os.symlink("../input/home-data-for-ml-course/test.csv", "../input/test.csv")
 
 binder.bind(globals())
-
 print("Setup Complete")
 
-# Read the data
-samples_full = pd.read_csv("../input/train.csv", index_col="Id")
-samples_submit_full = pd.read_csv("../input/test.csv", index_col="Id")
 
+# Read the data
+X_full = pd.read_csv("../input/train.csv", index_col="Id")
+X_test_full = pd.read_csv("../input/test.csv", index_col="Id")
 
 # Remove rows with missing target, separate target from predictors
-samples_full.dropna(axis=0, subset=["SalePrice"], inplace=True)
-labels = samples_full.SalePrice
-samples_full.drop(["SalePrice"], axis=1, inplace=True)
-
-# To keep things simple, we'll use only numerical predictors
-samples = samples_full.select_dtypes(exclude=["object"])
-samples_submit = samples_submit_full.select_dtypes(exclude=["object"])
-
-imputer = SimpleImputer(strategy="median")
-imputed_samples = pd.DataFrame(imputer.fit_transform(samples))
-imputed_samples_submit = pd.DataFrame(imputer.transform(samples_submit))
+X_full.dropna(axis=0, subset=["SalePrice"], inplace=True)
+y = X_full.SalePrice
+X_full.drop(["SalePrice"], axis=1, inplace=True)
 
 # Break off validation set from training data
-(
-    imputed_samples_train,
-    imputed_samples_check,
-    labels_train,
-    labels_check,
-) = train_test_split(imputed_samples, labels, train_size=0.8, random_state=0)
-
-
-def score_model(model):
-    model.fit(imputed_samples_train, labels_train)
-    predictions = model.predict(imputed_samples_check)
-
-    return round(mean_absolute_error(predictions, labels_check), 2)
-
-
-# results = {}
-# for value in np.arange(2, 10, 1):
-##for value in ["mae", "mse"]:
-#    print('Evaluating ', value)
-#    model = RandomForestRegressor(
-#        n_estimators=71,min_samples_split=5, criterion="mae", max_depth=18, random_state=0
-#    )
-
-#    results[value] = score_model(model)
-
-# results_by_score = sorted(results.items(), key=lambda x: x[1])
-# print(results_by_score)
-
-model = RandomForestRegressor(
-    n_estimators=71, min_samples_split=5, criterion="mae", max_depth=18, random_state=0
+X_train_full, X_valid_full, y_train, y_valid = train_test_split(
+    X_full, y, train_size=0.8, test_size=0.2, random_state=0
 )
 
-model.fit(imputed_samples, labels)
-predictions = model.predict(imputed_samples_submit)
+# "Cardinality" means the number of unique values in a column
+# Select categorical columns with relatively low cardinality (convenient but arbitrary)
+categorical_cols = [
+    cname
+    for cname in X_train_full.columns
+    if X_train_full[cname].nunique() < 10 and X_train_full[cname].dtype == "object"
+]
 
-# Save predictions in format used for competition scoring
-output = pd.DataFrame({"Id": samples_submit.index, "SalePrice": predictions})
+# Select numerical columns
+numerical_cols = [
+    cname
+    for cname in X_train_full.columns
+    if X_train_full[cname].dtype in ["int64", "float64"]
+]
+
+# Keep selected columns only
+my_cols = categorical_cols + numerical_cols
+X_train = X_train_full[my_cols].copy()
+X_valid = X_valid_full[my_cols].copy()
+X_test = X_test_full[my_cols].copy()
+
+# Preprocessing for numerical data
+numerical_transformer = SimpleImputer(strategy="constant")
+
+# Preprocessing for categorical data
+categorical_transformer = Pipeline(
+    steps=[
+        ("imputer", SimpleImputer(strategy="constant")),
+        ("onehot", OneHotEncoder(handle_unknown="ignore")),
+    ]
+)
+
+# Bundle preprocessing for numerical and categorical data
+preprocessor = ColumnTransformer(
+    transformers=[
+        ("num", numerical_transformer, numerical_cols),
+        ("cat", categorical_transformer, categorical_cols),
+    ]
+)
+
+# Define model
+model = RandomForestRegressor(n_estimators=100, random_state=0)
+
+# Bundle preprocessing and modeling code in a pipeline
+pipeline = Pipeline(steps=[("preprocessor", preprocessor), ("model", model)])
+
+# Preprocessing of training data, fit model
+pipeline.fit(X_train, y_train)
+
+# Preprocessing of validation data, get predictions
+predictions = pipeline.predict(X_valid)
+
+# Evaluate the model
+score = mean_absolute_error(y_valid, predictions)
+print("MAE:", score)
+
+# Preprocessing of test data, fit model
+predictions_test = pipeline.predict(X_test)  # Your code here
+
+# Save test predictions to file
+output = pd.DataFrame({"Id": X_test.index, "SalePrice": predictions_test})
 output.to_csv("submission.csv", index=False)
