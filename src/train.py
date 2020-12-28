@@ -2,11 +2,10 @@
 # Import dependencies
 import pandas as pd
 import seaborn as sns
-from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.compose import make_column_transformer, ColumnTransformer
+from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
-from sklearn.pipeline import make_pipeline, FeatureUnion
-from sklearn.preprocessing import OneHotEncoder, LabelEncoder, FunctionTransformer
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import OneHotEncoder, FunctionTransformer
 from sklearn.feature_extraction.text import CountVectorizer
 from xgboost import XGBRegressor
 from helpers import *
