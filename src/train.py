@@ -179,6 +179,15 @@ def select_column_types(types, omit=[]):
 
 
 # %%
+# Assemble transformers
+data_transformer = make_pipeline(
+    FunctionTransformer(backfill_missing),
+    FunctionTransformer(transform_ordinal),
+    FunctionTransformer(create_features),
+)
+
+transformed = data_transformer.fit_transform(X.copy())
+# %%
 ## Assemble preprocessors
 continuous_transformer = SimpleImputer(strategy="constant")
 
@@ -187,30 +196,49 @@ categorical_transformer = make_pipeline(
     OneHotEncoder(handle_unknown="ignore", sparse=False),
 )
 
+list_features = ["Attributes"]
+continuous_features = select_column_types(["int", "float"])
+categorical_features = select_column_types(["object"], list_features)
+
 preprocessor = make_pipeline(
-    make_pipeline(
-        FunctionTransformer(backfill_missing),
-        FunctionTransformer(create_features),
-        FunctionTransformer(transform_ordinal),
-    ),
+    data_transformer,
     ColumnTransformer(
         transformers=[
             (
                 "continuous",
                 continuous_transformer,
-                select_column_types(["int", "float"]),
+                continuous_features,
             ),
             (
                 "categorical",
                 categorical_transformer,
-                select_column_types(["object"], ["Attributes"]),
+                categorical_features,
             ),
-            ("list", CountVectorizer(analyzer=set), "Attributes"),
+            ("list", CountVectorizer(analyzer=set), list_features[0]),
         ]
     ),
 )
+# %%
+# Preview processed dataset
+processed = preprocessor.fit_transform(X.copy(), y)
 
-processed = pd.DataFrame(preprocessor.fit_transform(X, y))
+applied_transformers = preprocessor.named_steps.columntransformer.named_transformers_
+
+continuous_features = continuous_features(transformed)
+
+categorical_features = (
+    applied_transformers.categorical.named_steps.onehotencoder.get_feature_names(
+        categorical_features(transformed)
+    ).tolist()
+)
+
+list_features = [
+    "Attribute" + col for col in applied_transformers.list.get_feature_names()
+]
+
+processed_features = continuous_features + categorical_features + list_features
+processed = pd.DataFrame(processed, columns=processed_features)
+processed.head()
 # %% Create pipeline
 pipeline = make_pipeline(preprocessor, XGBRegressor())
 # %%

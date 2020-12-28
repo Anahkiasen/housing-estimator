@@ -26,6 +26,11 @@ pd.set_option("display.max_columns", 50)
 pd.set_option("display.max_rows", 50)
 
 
+def print_all(data):
+    with pd.option_context("display.max_rows", None, "display.max_columns", None):
+        print(data)
+
+
 def get_score(model, X, y, cv_options={}):
     start_time = time.time()
     name = model.__class__.__name__
