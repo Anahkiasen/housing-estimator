@@ -111,6 +111,14 @@ def create_features(data):
         + data.WoodDeckSF
     )
 
+    data["TotalQual"] = (
+        data.OverallQual
+        + data.ExterQual
+        + data.BsmtQual
+        + data.KitchenQual
+        + data.GarageQual
+    )
+
     return data.drop(list_columns, axis="columns")
 
 
