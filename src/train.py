@@ -53,10 +53,53 @@ arbitrary = []
 features = continuous + categorical
 all_features = features + ["SalePrice"]
 removed_features = X.columns.drop(features).tolist()
+# %%
+# Change the type of some columns
+rating_columns = [
+    "BsmtCond",
+    "BsmtQual",
+    "ExterCond",
+    "ExterQual",
+    "FireplaceQu",
+    "GarageCond",
+    "GarageQual",
+    "HeatingQC",
+    "KitchenQual",
+]
 
-# Make some continuous features categorical
+finition_columns = ["BsmtFinType1", "BsmtFinType2"]
+
+converted_ordinal = rating_columns + finition_columns + ["BsmtExposure", "Fence"]
+
+
+def transform_ratings(data):
+    for col in rating_columns:
+        data[col] = data[col].map(
+            {"Ex": 5, "Gd": 4, "TA": 3, "Fa": 2, "Po": 1, "NA": 0}
+        )
+
+    for col in finition_columns:
+        data[col] = data[col].map(
+            {"GLQ": 6, "ALQ": 5, "BLQ": 4, "Rec": 3, "LwQ": 2, "Unf": 1, "NA": 0}
+        )
+
+    data["BsmtExposure"] = data["BsmtExposure"].map(
+        {"Gd": 4, "Av": 3, "Mn": 2, "No": 1, "NA": 0}
+    )
+
+    data["Fence"] = data["Fence"].map(
+        {"GdPrv": 4, "MnPrv": 3, "GdWo": 2, "MnWw": 1, "NA": 0}
+    )
+
+    return data
+
+
 continuous.remove("MSSubClass")
 categorical.append("MSSubClass")
+
+for converted in converted_ordinal:
+    categorical.remove(converted)
+    continuous.append(converted)
 # %%
 # Concatenate list columns
 listed = [
@@ -64,8 +107,8 @@ listed = [
     "Condition2",
     "Exterior1st",
     "Exterior2nd",
-    "BsmtFinType1",
-    "BsmtFinType2",
+    # "BsmtFinType1",
+    # "BsmtFinType2",
 ]
 
 for col in listed:
@@ -90,7 +133,10 @@ def create_attributes(data):
 
 
 preprocessor = make_pipeline(
-    FunctionTransformer(create_attributes),
+    make_pipeline(
+        FunctionTransformer(create_attributes),
+        FunctionTransformer(transform_ratings),
+    ),
     ColumnTransformer(
         transformers=[
             (
