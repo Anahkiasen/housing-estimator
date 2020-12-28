@@ -13,11 +13,13 @@ from helpers import *
 # Import the data
 X_train = pd.read_csv("../input/home-data-for-ml-course/train.csv", index_col="Id")
 X_test = pd.read_csv("../input/home-data-for-ml-course/test.csv", index_col="Id")
-
+# %%
+# Drop outliers
+outliers = X_train[(X_train.OverallQual > 9) & (X_train.SalePrice < 220000)].index
+X_train.drop(outliers, inplace=True)
 # %% [code]
 ## Split predictor
 [X, y] = split_predictor(X_train, "SalePrice")
-
 # %%
 ## Define correlated features
 correlations = X_train.corr()
