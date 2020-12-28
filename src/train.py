@@ -207,7 +207,11 @@ data_transformer = make_pipeline(
 transformed = data_transformer.fit_transform(X.copy())
 # %%
 ## Assemble preprocessors
-continuous_transformer = SimpleImputer(strategy="constant")
+from sklearn.preprocessing import StandardScaler
+
+continuous_transformer = make_pipeline(
+    SimpleImputer(strategy="constant"), StandardScaler()
+)
 
 categorical_transformer = make_pipeline(
     SimpleImputer(strategy="most_frequent"),
