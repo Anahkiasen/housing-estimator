@@ -129,7 +129,6 @@ def backfill_missing(data):
     no_basement = data[data.TotalBsmtSF == 0].index
     no_fireplace = data[data.Fireplaces == 0].index
     no_pool = data[data.PoolArea == 0].index
-    no_masonry = data[data.PoolArea == 0].index
 
     garage_categorical = ["GarageType", "GarageFinish", "GarageQual", "GarageCond"]
     garage_ordinal = ["GarageCars", "GarageArea", "GarageYrBlt"]
