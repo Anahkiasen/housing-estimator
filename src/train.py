@@ -73,6 +73,8 @@ def transform_ordinal(data):
         {"GdPrv": 4, "MnPrv": 3, "GdWo": 2, "MnWw": 1, "NA": 0}
     )
 
+    data["MSSubClass"] = data["MSSubClass"].astype(str)
+
     return data
 
 
@@ -243,6 +245,8 @@ processed = pd.DataFrame(processed, columns=processed_features)
 processed.head()
 
 processed["SalePrice"] = y
+
+processed.head()
 # %% Create pipeline
 pipeline = make_pipeline(preprocessor, XGBRegressor())
 # %%
