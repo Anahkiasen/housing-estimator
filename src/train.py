@@ -75,8 +75,8 @@ def transform_ordinal(data):
 
 
 # %%
-# Merge all attributes
-def merge_attributes(data):
+# Create new features
+def create_features(data):
     list_columns = [
         "Condition1",
         "Condition2",
@@ -88,7 +88,24 @@ def merge_attributes(data):
         list(row[list_columns].astype(str)) for _, row in data.iterrows()
     ]
 
-    # data["TotalSF"] = data["TotalBsmtSF"] + data["1stFlrSF"] + data["2ndFlrSF"]
+    data["TotalSF"] = data.TotalBsmtSF + data["1stFlrSF"] + data["2ndFlrSF"]
+
+    data["YearBuilts"] = data.YearBuilt + data.YearRemodAdd
+
+    data["TotalBathrooms"] = (
+        data.FullBath
+        + (0.5 * data.HalfBath)
+        + data.BsmtFullBath
+        + (0.5 * data.BsmtHalfBath)
+    )
+
+    data["TotalPorchSF"] = (
+        data.OpenPorchSF
+        + data["3SsnPorch"]
+        + data.EnclosedPorch
+        + data.ScreenPorch
+        + data.WoodDeckSF
+    )
 
     return data.drop(list_columns, axis="columns")
 
@@ -171,7 +188,7 @@ categorical_transformer = make_pipeline(
 preprocessor = make_pipeline(
     make_pipeline(
         FunctionTransformer(backfill_missing),
-        FunctionTransformer(merge_attributes),
+        FunctionTransformer(create_features),
         FunctionTransformer(transform_ordinal),
     ),
     ColumnTransformer(
@@ -192,8 +209,6 @@ preprocessor = make_pipeline(
 )
 
 processed = pd.DataFrame(preprocessor.fit_transform(X, y))
-
-processed.head()
 # %% Create pipeline
 pipeline = make_pipeline(preprocessor, XGBRegressor())
 # %%
