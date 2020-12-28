@@ -14,6 +14,9 @@ from helpers import *
 # Import the data
 X_train = pd.read_csv("../input/home-data-for-ml-course/train.csv", index_col="Id")
 X_test = pd.read_csv("../input/home-data-for-ml-course/test.csv", index_col="Id")
+X_all = X_train.append(X_test)
+
+X_all
 # %%
 # Drop outliers
 outliers = X_train[(X_train.OverallQual > 9) & (X_train.SalePrice < 220000)].index
