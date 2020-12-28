@@ -120,8 +120,10 @@ def backfill_missing(data):
     no_garages = data[data.GarageArea == 0].index
     no_basement = data[data.TotalBsmtSF == 0].index
     no_fireplace = data[data.Fireplaces == 0].index
+    no_pool = data[data.PoolArea == 0].index
+    no_masonry = data[data.PoolArea == 0].index
 
-    garage_categorical = ["GarageType", "GarageFinish", "GarageQual"]
+    garage_categorical = ["GarageType", "GarageFinish", "GarageQual", "GarageCond"]
     garage_ordinal = ["GarageCars", "GarageArea", "GarageYrBlt"]
     basement_categorical = [
         "BsmtQual",
@@ -140,6 +142,7 @@ def backfill_missing(data):
     ]
 
     data.loc[no_garages, garage_categorical] = "NA"
+    data.loc[no_pool, ["PoolQC"]] = "NA"
     data.loc[no_fireplace, ["FireplaceQu"]] = "NA"
     data.loc[
         no_basement,
@@ -148,6 +151,10 @@ def backfill_missing(data):
 
     data.loc[no_garages, garage_ordinal] = 0
     data.loc[no_basement, basement_ordinal] = 0
+
+    data["MSZoning"] = data.groupby("MSSubClass")["MSZoning"].transform(
+        lambda x: x.fillna(x.mode()[0])
+    )
 
     return data
 
@@ -245,8 +252,6 @@ processed = pd.DataFrame(processed, columns=processed_features)
 processed.head()
 
 processed["SalePrice"] = y
-
-processed.head()
 # %% Create pipeline
 pipeline = make_pipeline(preprocessor, XGBRegressor())
 # %%
