@@ -115,6 +115,7 @@ def create_features(data):
 def backfill_missing(data):
     no_garages = data[data.GarageArea == 0].index
     no_basement = data[data.TotalBsmtSF == 0].index
+    no_fireplace = data[data.Fireplaces == 0].index
 
     garage_categorical = ["GarageType", "GarageFinish", "GarageQual"]
     garage_ordinal = ["GarageCars", "GarageArea", "GarageYrBlt"]
@@ -135,6 +136,7 @@ def backfill_missing(data):
     ]
 
     data.loc[no_garages, garage_categorical] = "NA"
+    data.loc[no_fireplace, ["FireplaceQu"]] = "NA"
     data.loc[
         no_basement,
         basement_categorical,
