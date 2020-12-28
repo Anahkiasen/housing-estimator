@@ -1,8 +1,3 @@
-import os
-import optparse
-import pandas as pd
-import numpy as np
-import time
 from learntools.core import binder
 from learntools.ml_intermediate.ex4 import *
 from sklearn.compose import ColumnTransformer, make_column_transformer
@@ -12,7 +7,13 @@ from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+from xgboost import XGBRegressor
 import matplotlib.pyplot as plt
+import numpy as np
+import optparse
+import os
+import pandas as pd
+import time
 
 if not os.path.exists("../input/train.csv"):
     os.symlink("../input/home-data-for-ml-course/train.csv", "../input/train.csv")
@@ -82,11 +83,9 @@ preprocessor = ColumnTransformer(
 # 3. Cross-validation
 ########################################
 
-# %matplotlib inline
-
-model_configuration = {"n_estimators": 50, "random_state": 0}
-validation_range = np.arange(10, 200, 10)
-validation_argument = "max_depth"
+model_configuration = {"n_estimators": 100, "learning_rate": 0.1, "random_state": 0}
+validation_range = np.arange(0.05, 0.3, 0.05)
+validation_argument = "learning_rate"
 validate = False
 submit = True
 
@@ -100,15 +99,20 @@ def get_score(validation_configuration):
             ("preprocessor", preprocessor),
             (
                 "model",
-                RandomForestRegressor(
-                    **model_configuration, **validation_configuration
-                ),
+                XGBRegressor(**model_configuration, **validation_configuration),
             ),
         ]
     )
 
     scores = -1 * cross_val_score(
-        pipeline, X, y, cv=5, scoring="neg_mean_absolute_error"
+        pipeline,
+        X,
+        y,
+        cv=5,
+        scoring="neg_mean_absolute_error",
+        fit_params={
+            # "model__early_stopping_rounds": 5,
+        },
     )
 
     mean = scores.mean()
@@ -141,7 +145,7 @@ pipeline = Pipeline(
         ("preprocessor", preprocessor),
         (
             "model",
-            RandomForestRegressor(**model_configuration),
+            XGBRegressor(**model_configuration),
         ),
     ]
 )
