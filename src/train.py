@@ -12,21 +12,21 @@ from helpers import *
 
 # %%
 # Import the data
-X_train = pd.read_csv("../input/home-data-for-ml-course/train.csv", index_col="Id")
-X_test = pd.read_csv("../input/home-data-for-ml-course/test.csv", index_col="Id")
-X_all = X_train.append(X_test)
+data_train = pd.read_csv("../input/home-data-for-ml-course/train.csv", index_col="Id")
+data_test = pd.read_csv("../input/home-data-for-ml-course/test.csv", index_col="Id")
+data_all = data_train.append(data_test)
 
-X_all
+data_all
 # %%
 # Drop outliers
-outliers = X_train[(X_train.OverallQual > 9) & (X_train.SalePrice < 220000)].index
-X_train.drop(outliers, inplace=True)
+outliers = data_train[(data_train.OverallQual > 9) & (data_train.SalePrice < 220000)].index
+data_train.drop(outliers, inplace=True)
 # %%
 ## Split predictor
-[X, y] = split_predictor(X_train, "SalePrice")
+[X, y] = split_predictor(data_train, "SalePrice")
 # %%
 ## Examine correlated features
-correlations = X_train.corr()
+correlations = data_train.corr()
 
 # sns.heatmap(correlations, mask=correlations < 0.7, annot=True)
 
@@ -37,7 +37,7 @@ correlations = X_train.corr()
 # TotalBsmtSF > 1stFlrSF
 correlated = ["GarageYrBlt", "TotRmsAbvGrd", "GarageCars", "1stFlrSF"]
 
-X_train.corr().SalePrice.sort_values()
+correlations.SalePrice.sort_values()
 # %%
 # Convert some features to their proper types
 def transform_ordinal(data):
@@ -306,7 +306,7 @@ get_score(pipeline, X, y, {"scoring": "neg_mean_absolute_error"})
 # %%
 ## Get predictions
 pipeline.fit(X, y)
-predictions = pipeline.predict(X_test)
-submissions = {"Id": X_test.index, "SalePrice": predictions}
+predictions = pipeline.predict(data_test)
+submissions = {"Id": data_test.index, "SalePrice": predictions}
 
 submit_predictions(submissions)
