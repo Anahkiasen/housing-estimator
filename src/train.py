@@ -2,17 +2,16 @@
 # Import dependencies
 import pandas as pd
 import seaborn as sns
-from helpers import *
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.impute import SimpleImputer
 from sklearn.inspection import permutation_importance
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import OneHotEncoder, FunctionTransformer
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, StandardScaler
 from xgboost import XGBRegressor
+from helpers import *
 
 # %%
 # Import the data
@@ -230,43 +229,57 @@ preprocessor = make_pipeline(
     treshold,
 )
 # %%
-# Find best hyperparameters
+# Create pipeline
 best_params = {
-    "xgbregressor__learning_rate": 0.03,
-    "xgbregressor__max_depth": 3,
-    "xgbregressor__n_estimators": 1000,
-    "xgbregressor__min_child_weight": 2,
-    "xgbregressor__gamma": 0,
-    "xgbregressor__subsample": 0.75,
     "pipeline__variancethreshold__threshold": 0.001,
+    "xgbregressor__alpha": 0.5,
+    "xgbregressor__colsample_bylevel": 0.7,
+    "xgbregressor__colsample_bytree": 0.5,
+    "xgbregressor__gamma": 0.03,
+    "xgbregressor__lambda": 0.6,
+    "xgbregressor__learning_rate": 0.03,
+    "xgbregressor__max_depth": 4,
+    "xgbregressor__min_child_weight": 1.4,
+    "xgbregressor__n_estimators": 1000,
+    "xgbregressor__subsample": 0.9,
 }
 
-if not best_params:
-    grid_search = GridSearchCV(
+model = XGBRegressor()
+pipeline = make_pipeline(preprocessor, model)
+_ = pipeline.set_params(**best_params)
+# %%
+# Find best hyperparameters
+if False:
+    decimal = np.arange(1.1, step=0.1)
+    subdecimal = np.arange(0.11, step=0.01)
+
+    grid_search = RandomizedSearchCV(
         pipeline,
         {
-            "xgbregressor__n_estimators": [100, 500, 1000],
-            "xgbregressor__learning_rate": [0.01, 0.03],
-            "xgbregressor__max_depth": [3, 6, 9],
-            "xgbregressor__min_child_weight": [1, 2, 3],
-            "xgbregressor__gamma": [0, 0.1],
-            "xgbregressor__subsample": [0.25, 0.5, 0.75],
-            "pipeline__variancethreshold__threshold": np.arange(
-                start=0, stop=0.01, step=0.001
-            ),
+            "pipeline__variancethreshold__threshold": [0.001],
+            "xgbregressor__alpha": decimal,
+            "xgbregressor__colsample_bylevel": decimal,
+            "xgbregressor__colsample_bytree": decimal,
+            "xgbregressor__gamma": subdecimal,
+            "xgbregressor__lambda": decimal,
+            "xgbregressor__learning_rate": subdecimal,
+            "xgbregressor__max_depth": np.arange(6),
+            "xgbregressor__min_child_weight": np.arange(1, 2.1, step=0.1),
+            "xgbregressor__n_estimators": [1000],
+            "xgbregressor__subsample": decimal,
         },
-        scoring="neg_root_mean_squared_error",
+        scoring="neg_mean_absolute_error",
+        n_iter=100,
+        n_jobs=-1,
         verbose=10,
     )
 
     grid_search.fit(X, y)
+    best_score = grid_search.best_score_
     best_params = grid_search.best_params_
+
+    print(best_score)
     print(best_params)
-# %%
-# Create pipeline
-model = XGBRegressor()
-pipeline = make_pipeline(preprocessor, model)
-pipeline.set_params(**best_params)
 # %%
 # Score pipeline
 get_score(pipeline, X, y, {"scoring": "neg_mean_absolute_error"})
