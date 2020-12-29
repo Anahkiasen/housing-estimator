@@ -34,8 +34,6 @@ data_train.drop(outliers, inplace=True)
 ## Examine correlated features
 correlations = data_train.corr()
 
-# sns.heatmap(correlations, mask=correlations < 0.7, annot=True)
-
 # Sorted by correlation factor
 # YearBuilt > GarageYrBuilt
 # GarageArea > GarageCars
@@ -43,7 +41,8 @@ correlations = data_train.corr()
 # TotalBsmtSF > 1stFlrSF
 correlated = ["GarageYrBlt", "TotRmsAbvGrd", "GarageCars", "1stFlrSF"]
 
-correlations.SalePrice.sort_values()
+# sns.heatmap(correlations, mask=correlations < 0.7, annot=True)
+# correlations.SalePrice.sort_values()
 # %%
 # Convert some features to their proper types
 def transform_ordinal(data):
