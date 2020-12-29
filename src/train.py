@@ -174,30 +174,14 @@ def backfill_missing(data):
 
 # %%
 # Drop near-constant and missing features
-def remove_unused_features(data):
-    ## Define data leaks
-    data_leaks = ["MoSold", "YrSold", "SaleType", "SalePrice"]
-
-    ## Define arbitrary features
-    arbitrary = []
-
-    ## Select features
-    [continuous, categorical] = get_features(
-        data,
-        data_leaks + arbitrary + correlated,
-        debug=False,
-        constant_treshold=0.99,
-        missing_treshold=0.94,
-    )
-
-    return data[continuous + categorical]
+data_leaks = ["MoSold", "YrSold", "SaleType", "SalePrice"]
+arbitrary = []
 
 
 def select_column_types(types, omit=[]):
     return (
-        lambda data: remove_unused_features(data)
-        .select_dtypes(types)
-        .columns.drop(omit)
+        lambda data: data.select_dtypes(types)
+        .columns.drop(data_leaks + arbitrary + correlated + omit, errors="ignore")
         .tolist()
     )
 
@@ -213,8 +197,6 @@ data_transformer = make_pipeline(
 transformed = data_transformer.fit_transform(X.copy())
 # %%
 ## Assemble preprocessors
-from sklearn.preprocessing import StandardScaler
-
 continuous_transformer = make_pipeline(
     SimpleImputer(strategy="constant"), StandardScaler()
 )
@@ -227,6 +209,7 @@ categorical_transformer = make_pipeline(
 list_features = ["Attributes"]
 continuous_features = select_column_types(["int", "float"])
 categorical_features = select_column_types(["object"], list_features)
+treshold = VarianceThreshold()
 
 preprocessor = make_pipeline(
     data_transformer,
@@ -245,7 +228,49 @@ preprocessor = make_pipeline(
             ("list", CountVectorizer(analyzer=set), list_features[0]),
         ]
     ),
+    treshold,
 )
+# %%
+# Find best hyperparameters
+best_params = {
+    "xgbregressor__learning_rate": 0.03,
+    "xgbregressor__max_depth": 3,
+    "xgbregressor__n_estimators": 1000,
+    "xgbregressor__min_child_weight": 2,
+    "xgbregressor__gamma": 0,
+    "xgbregressor__subsample": 0.75,
+    "pipeline__variancethreshold__threshold": 0.001,
+}
+
+if not best_params:
+    grid_search = GridSearchCV(
+        pipeline,
+        {
+            "xgbregressor__n_estimators": [100, 500, 1000],
+            "xgbregressor__learning_rate": [0.01, 0.03],
+            "xgbregressor__max_depth": [3, 6, 9],
+            "xgbregressor__min_child_weight": [1, 2, 3],
+            "xgbregressor__gamma": [0, 0.1],
+            "xgbregressor__subsample": [0.25, 0.5, 0.75],
+            "pipeline__variancethreshold__threshold": np.arange(
+                start=0, stop=0.01, step=0.001
+            ),
+        },
+        scoring="neg_root_mean_squared_error",
+        verbose=10,
+    )
+
+    grid_search.fit(X, y)
+    best_params = grid_search.best_params_
+    print(best_params)
+# %%
+# Create pipeline
+model = XGBRegressor()
+pipeline = make_pipeline(preprocessor, model)
+pipeline.set_params(**best_params)
+# %%
+# Score pipeline
+get_score(pipeline, X, y, {"scoring": "neg_mean_absolute_error"})
 # %%
 # Preview processed dataset
 processed = preprocessor.fit_transform(X.copy(), y)
@@ -261,54 +286,28 @@ transformed_categorical = (
 )
 
 transformed_list = [
-    "Attribute" + col for col in applied_transformers.list.get_feature_names()
+    "Attribute_" + col for col in applied_transformers.list.get_feature_names()
 ]
 
 processed_features = transformed_continuous + transformed_categorical + transformed_list
-processed = pd.DataFrame(processed, columns=processed_features)
+kept_features = [processed_features[i] for i in treshold.get_support(True)]
+removed_features = [col for col in processed_features if col not in kept_features]
+processed = pd.DataFrame(processed, columns=kept_features)
+
 processed.head()
 
-processed["SalePrice"] = y
-# %% Create pipeline
-pipeline = make_pipeline(preprocessor, XGBRegressor())
+removed_features
 # %%
-# Find best hyperparameters
-from sklearn.model_selection import GridSearchCV
+# Score features
+# test = X.copy()
+# pipeline.fit(test, y)
+# results = permutation_importance(pipeline, test, y, scoring="neg_mean_squared_error", n_jobs=-1)
 
-best_params = {
-    "xgbregressor__learning_rate": 0.03,
-    "xgbregressor__max_depth": 3,
-    "xgbregressor__n_estimators": 1000,
-    "xgbregressor__min_child_weight": 2,
-    "xgbregressor__gamma": 0,
-    "xgbregressor__subsample": 0.75,
-}
+# importances = pd.Series(results.importances_mean, index=test.columns).sort_values()
+# negative = importances[importances < 0]
+# important = importances[importances > 0]
 
-if not best_params:
-    grid_search = GridSearchCV(
-        pipeline,
-        {
-            "xgbregressor__n_estimators": [100, 500, 1000],
-            "xgbregressor__learning_rate": [0.01, 0.03],
-            "xgbregressor__max_depth": [3, 6, 9],
-            "xgbregressor__min_child_weight": [1, 2, 3],
-            "xgbregressor__gamma": [0, 0.1],
-            "xgbregressor__subsample": [0.25, 0.5, 0.75],
-        },
-        scoring="neg_root_mean_squared_error",
-        verbose=10,
-        n_jobs=-1,
-    )
-
-    grid_search.fit(X, y)
-    best_params = grid_search.best_params_
-    print(best_params)
-# %%
-# Score pipeline
-pipeline.set_params(**best_params)
-
-get_score(pipeline, X, y, {"scoring": "neg_mean_absolute_error"})
-# %%
+# negative
 # %%
 ## Get predictions
 pipeline.fit(X, y)
