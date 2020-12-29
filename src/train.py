@@ -2,24 +2,30 @@
 # Import dependencies
 import pandas as pd
 import seaborn as sns
+from helpers import *
 from sklearn.compose import ColumnTransformer
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_selection import VarianceThreshold
 from sklearn.impute import SimpleImputer
+from sklearn.inspection import permutation_importance
+from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import OneHotEncoder, FunctionTransformer
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.preprocessing import StandardScaler
 from xgboost import XGBRegressor
-from helpers import *
 
 # %%
 # Import the data
 data_train = pd.read_csv("../input/home-data-for-ml-course/train.csv", index_col="Id")
 data_test = pd.read_csv("../input/home-data-for-ml-course/test.csv", index_col="Id")
-data_all = data_train.append(data_test)
+data = data_train.append(data_test)
 
-data_all
+data
 # %%
 # Drop outliers
-outliers = data_train[(data_train.OverallQual > 9) & (data_train.SalePrice < 220000)].index
+outliers = data_train[
+    (data_train.OverallQual > 9) & (data_train.SalePrice < 220000)
+].index
 data_train.drop(outliers, inplace=True)
 # %%
 ## Split predictor
